@@ -1,0 +1,7 @@
+# Keep build artifacts out of Docker build context.
+build/
+llvm-project/
+install/
+.cache/
+.git/
+*.log
