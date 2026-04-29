@@ -17,11 +17,14 @@
 #     must not block future pushes.
 set -euo pipefail
 
+# Visible breadcrumb on the pusher's terminal -- proves the hook ran.
+echo "post-receive: hook invoked at $(date -u +%FT%TZ)" >&2
+
 # --- Resolve repo paths ------------------------------------------------------
-# When invoked as a hook, $GIT_DIR points at the .git directory.
+# When invoked as a hook, $GIT_DIR points at the .git directory. The work
+# tree is its parent (this hook is only used in non-bare repos).
 GIT_DIR_ABS="$(cd "${GIT_DIR:-.}" && pwd)"
-WORK_TREE="$(git --git-dir="${GIT_DIR_ABS}" rev-parse --show-toplevel 2>/dev/null \
-              || dirname "${GIT_DIR_ABS}")"
+WORK_TREE="$(dirname "${GIT_DIR_ABS}")"
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
 
 LOG_FILE="${WORK_TREE}/.git/agent_prompt.log"
@@ -80,14 +83,15 @@ while read -r old_oid new_oid ref; do
     echo "post-receive: running copilot agent for ${branch} (output -> ${LOG_FILE})"
     log "running copilot agent for ${branch}"
 
-    # cd into the working tree so the agent operates in the right directory,
-    # and pass the prompt file directly via --prompt-file.
+    # cd into the working tree so the agent operates in the right directory.
+    # Pass the prompt as the value of -p (read the file contents in shell);
+    # this Copilot CLI version does not support --prompt-file.
     (
         cd "${WORK_TREE}"
         copilot-run \
             --allow-all \
             --no-color \
-            --prompt-file "${prompt_path}" \
+            -p "$(cat "${prompt_path}")" \
             >> "${LOG_FILE}" 2>&1
     ) || {
         echo "post-receive: copilot agent run failed; see ${LOG_FILE}" >&2

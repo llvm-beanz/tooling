@@ -3,7 +3,7 @@
 # This image provisions a build/test toolchain, bakes in the CMake
 # initial-cache file (Config.cmake), and clones llvm-project from
 # https://github.com/llvm/llvm-project.git at image-build time. The clone
-# lives at /home/dev/llvm/llvm-project. Configure/build/test still happen
+# lives at /home/dev/dev/llvm-project. Configure/build/test still happen
 # inside a running container via the helper scripts.
 #
 # Typical usage (from the host):
@@ -123,18 +123,11 @@ RUN set -eux; \
     chmod 0440 /etc/sudoers.d/${USER_NAME}
 
 USER ${USER_NAME}
-WORKDIR /home/${USER_NAME}/llvm
 
 # Clone llvm-project at image-build time. Always pulls from the upstream
 # repository so the resulting image is reproducible from this Dockerfile alone.
 # `receive.denyCurrentBranch=updateInstead` lets you push to the checked-out
 # branch from a host-side `git push` and have the working tree update.
-RUN set -eux; \
-    git clone --branch main \
-        https://github.com/llvm/llvm-project.git \
-        /home/${USER_NAME}/llvm/llvm-project; \
-    git -C /home/${USER_NAME}/llvm/llvm-project config receive.denyCurrentBranch updateInstead
-
 # Clone the auxiliary repos referenced by Config.cmake. Config.cmake looks
 # for these under $HOME/dev/, so place them there. Each is opt-in inside
 # Config.cmake (guarded by `if (EXISTS ...)`).
@@ -146,6 +139,10 @@ RUN set -eux; \
 #       it inside the container if you want DXC_DIR to take effect.)
 RUN set -eux; \
     mkdir -p /home/${USER_NAME}/dev; \
+    git clone --branch main \
+        https://github.com/llvm/llvm-project.git \
+        /home/${USER_NAME}/dev/llvm-project; \
+    git -C /home/${USER_NAME}/dev/llvm-project config receive.denyCurrentBranch updateInstead; \
     git clone --branch main --depth 1 \
         https://github.com/llvm/offload-test-suite.git \
         /home/${USER_NAME}/dev/offload-test-suite; \
@@ -161,7 +158,7 @@ RUN set -eux; \
 # repo root on that ref, runs `copilot-run --allow-all` with the file's
 # contents as the prompt.
 COPY --chown=${USER_UID}:${USER_GID} hooks/post-receive \
-    /home/${USER_NAME}/llvm/llvm-project/.git/hooks/post-receive
-RUN chmod +x /home/${USER_NAME}/llvm/llvm-project/.git/hooks/post-receive
+    /home/${USER_NAME}/dev/llvm-project/.git/hooks/post-receive
+RUN chmod +x /home/${USER_NAME}/dev/llvm-project/.git/hooks/post-receive
 
 CMD ["bash"]

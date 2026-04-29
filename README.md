@@ -4,7 +4,7 @@ A self-contained Ubuntu 24.04 image that provisions everything needed to
 configure, build, and test LLVM. The image bakes in the CMake initial-cache
 file (`Config.cmake`), the helper scripts, **and a clone of
 [llvm/llvm-project](https://github.com/llvm/llvm-project) at
-`/home/dev/llvm/llvm-project`**. Configure/build/test run inside a container.
+`/home/dev/dev/llvm-project`**. Configure/build/test run inside a container.
 The container does not require, and does not see, any of your host filesystem.
 
 ## Files
@@ -21,8 +21,7 @@ The container does not require, and does not see, any of your host filesystem.
 
 The scripts are linked inside the image as `llvm-configure`, `llvm-build`,
 `llvm-test`, and `copilot-run`. The default working directory is
-`/home/dev/llvm`, and the LLVM source tree lives at
-`/home/dev/llvm/llvm-project`.
+`/home/dev`, and the LLVM source tree lives at `/home/dev/dev/llvm-project`.
 
 ## Build the image
 
@@ -46,8 +45,8 @@ docker run --rm -it llvm-dev
 ## Workflow inside the container
 
 ```bash
-# Default working directory is /home/dev/llvm.
-# llvm-project is already cloned at /home/dev/llvm/llvm-project.
+# Default working directory is /home/dev.
+# llvm-project is already cloned at /home/dev/dev/llvm-project.
 
 # 1. Configure (uses the Config.cmake baked into the image by default).
 llvm-configure
@@ -156,7 +155,7 @@ docker volume create llvm-src
 docker volume create llvm-sccache
 
 docker run --rm -it `
-    -v llvm-src:/home/dev/llvm `
+    -v llvm-src:/home/dev/dev `
     -v llvm-sccache:/home/dev/.cache/sccache `
     -e SCCACHE_DIR=/home/dev/.cache/sccache `
     llvm-dev
@@ -168,7 +167,7 @@ it's on `PATH` (it is, in this image).
 ## Pushing branches from your host clone to the container
 
 The container's clone of llvm-project lives at
-`/home/dev/llvm/llvm-project` inside the container. It isn't reachable as a
+`/home/dev/dev/llvm-project` inside the container. It isn't reachable as a
 normal `git://`/`ssh://` URL, but git's `ext::` transport can tunnel
 `git-receive-pack` (and `git-upload-pack`) through `docker exec`, so a running
 container becomes a git remote.
@@ -200,7 +199,7 @@ docker run -dit --name llvm-dev-shell llvm-dev
 # From your local llvm-project checkout on the host:
 cd path\to\your\llvm-project
 git remote add container `
-    "ext::docker exec -i llvm-dev-shell %S /home/dev/llvm/llvm-project"
+    "ext::docker exec -i llvm-dev-shell %S /home/dev/dev/llvm-project"
 ```
 
 `%S` expands to `git-upload-pack` or `git-receive-pack` depending on whether
@@ -228,15 +227,15 @@ and reuse it:
 
 ```powershell
 docker volume create llvm-src
-docker run --rm -v llvm-src:/home/dev/llvm/llvm-project ^
-    llvm-dev git -C /home/dev/llvm/llvm-project config receive.denyCurrentBranch updateInstead
+docker run --rm -v llvm-src:/home/dev/dev/llvm-project ^
+    llvm-dev git -C /home/dev/dev/llvm-project config receive.denyCurrentBranch updateInstead
 ```
 
 Then point `ext::` at a transient container that mounts the same volume:
 
 ```powershell
 git remote add container `
-    "ext::docker run --rm -i -v llvm-src:/home/dev/llvm/llvm-project llvm-dev %S /home/dev/llvm/llvm-project"
+    "ext::docker run --rm -i -v llvm-src:/home/dev/dev/llvm-project llvm-dev %S /home/dev/dev/llvm-project"
 ```
 
 A new container is spun up per git operation, so you don't need a long-lived
