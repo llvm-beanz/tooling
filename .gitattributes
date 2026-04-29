@@ -9,6 +9,9 @@
 Dockerfile  text eol=lf
 .dockerignore text eol=lf
 
+# Git hooks are extensionless shell scripts; pin them to LF.
+hooks/*     text eol=lf
+
 # Markdown / docs -- normalize, but let the working tree follow autocrlf.
 *.md        text
 

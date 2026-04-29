@@ -68,7 +68,7 @@ RUN set -eux; \
         gdb \
         less \
         nano \
-        vim-tiny; \
+        vim; \
     rm -rf /var/lib/apt/lists/*; \
     locale-gen en_US.UTF-8
 
@@ -146,14 +146,22 @@ RUN set -eux; \
 #       it inside the container if you want DXC_DIR to take effect.)
 RUN set -eux; \
     mkdir -p /home/${USER_NAME}/dev; \
-    git clone --branch main \
+    git clone --branch main --depth 1 \
         https://github.com/llvm/offload-test-suite.git \
         /home/${USER_NAME}/dev/offload-test-suite; \
-    git clone --branch main \
+    git clone --branch main --depth 1 \
         https://github.com/llvm/offload-golden-images.git \
         /home/${USER_NAME}/dev/offload-golden-images; \
-    git clone --recurse-submodules \
+    git clone --recurse-submodules --branch main --depth 1 \
         https://github.com/microsoft/DirectXShaderCompiler.git \
         /home/${USER_NAME}/dev/DirectXShaderCompiler
+
+# Install the post-receive hook into the llvm-project clone. The hook
+# checks out each pushed branch and, if `agent_prompt.md` exists at the
+# repo root on that ref, runs `copilot-run --allow-all` with the file's
+# contents as the prompt.
+COPY --chown=${USER_UID}:${USER_GID} hooks/post-receive \
+    /home/${USER_NAME}/llvm/llvm-project/.git/hooks/post-receive
+RUN chmod +x /home/${USER_NAME}/llvm/llvm-project/.git/hooks/post-receive
 
 CMD ["bash"]

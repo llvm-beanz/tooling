@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# post-receive hook
+#
+# For each ref updated by a push:
+#   * If the ref is a branch (refs/heads/*) and was not deleted,
+#     check out that branch in the repository's working tree.
+#   * If the resulting working tree contains `agent_prompt.md` at its root,
+#     run Copilot CLI with that file's contents as the prompt and the
+#     `--allow-all` flag (so the agent can run tools without prompting).
+#
+# Notes:
+#   * Hooks run with GIT_DIR / GIT_WORK_TREE set; we unset them and operate
+#     on the repo via explicit -C / --git-dir arguments so checkout targets
+#     the real working tree (not the hook's bare-style environment).
+#   * Output is appended to $LOG_FILE so pushers see only a brief summary.
+#   * The hook never exits non-zero on Copilot failure -- a broken agent run
+#     must not block future pushes.
+set -euo pipefail
+
+# --- Resolve repo paths ------------------------------------------------------
+# When invoked as a hook, $GIT_DIR points at the .git directory.
+GIT_DIR_ABS="$(cd "${GIT_DIR:-.}" && pwd)"
+WORK_TREE="$(git --git-dir="${GIT_DIR_ABS}" rev-parse --show-toplevel 2>/dev/null \
+              || dirname "${GIT_DIR_ABS}")"
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+
+LOG_FILE="${WORK_TREE}/.git/agent_prompt.log"
+PROMPT_FILE_NAME="agent_prompt.md"
+
+log() {
+    printf '[%s] %s\n' "$(date -u +%FT%TZ)" "$*" >> "${LOG_FILE}"
+}
+
+# --- Process each pushed ref -------------------------------------------------
+# stdin format: <old-oid> <new-oid> <ref-name>\n ...
+zero="0000000000000000000000000000000000000000"
+
+while read -r old_oid new_oid ref; do
+    # Only branches; skip tags and anything exotic.
+    case "${ref}" in
+        refs/heads/*) branch="${ref#refs/heads/}" ;;
+        *) continue ;;
+    esac
+
+    # Skip deletions.
+    if [[ "${new_oid}" == "${zero}" ]]; then
+        log "skip deletion of ${ref}"
+        continue
+    fi
+
+    log "received ${ref} (${old_oid:0:10} -> ${new_oid:0:10})"
+
+    # Check out the pushed branch into the working tree. Use -f so a stale
+    # working tree from a prior push doesn't block the update. The push
+    # itself already advanced the ref, so this just syncs the work tree.
+    if ! git -C "${WORK_TREE}" checkout -f "${branch}" >> "${LOG_FILE}" 2>&1; then
+        echo "post-receive: failed to check out ${branch}; see ${LOG_FILE}" >&2
+        log "checkout of ${branch} failed; aborting agent run for this ref"
+        continue
+    fi
+    git -C "${WORK_TREE}" reset --hard "${new_oid}" >> "${LOG_FILE}" 2>&1 || true
+
+    prompt_path="${WORK_TREE}/${PROMPT_FILE_NAME}"
+    if [[ ! -f "${prompt_path}" ]]; then
+        log "no ${PROMPT_FILE_NAME} at repo root; skipping agent run"
+        continue
+    fi
+
+    if [[ ! -s "${prompt_path}" ]]; then
+        log "${PROMPT_FILE_NAME} is empty; skipping agent run"
+        continue
+    fi
+
+    if ! command -v copilot-run >/dev/null 2>&1; then
+        echo "post-receive: copilot-run is not on PATH; skipping" >&2
+        log "copilot-run not found on PATH"
+        continue
+    fi
+
+    echo "post-receive: running copilot agent for ${branch} (output -> ${LOG_FILE})"
+    log "running copilot agent for ${branch}"
+
+    # cd into the working tree so the agent operates in the right directory,
+    # and pass the prompt file directly via --prompt-file.
+    (
+        cd "${WORK_TREE}"
+        copilot-run \
+            --allow-all \
+            --no-color \
+            --prompt-file "${prompt_path}" \
+            >> "${LOG_FILE}" 2>&1
+    ) || {
+        echo "post-receive: copilot agent run failed; see ${LOG_FILE}" >&2
+        log "copilot agent run for ${branch} exited non-zero (ignored)"
+        continue
+    }
+
+    log "copilot agent run for ${branch} completed"
+done
+
+# Always succeed; pushes must not be blocked by hook side effects.
+exit 0

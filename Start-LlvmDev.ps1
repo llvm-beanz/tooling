@@ -68,9 +68,28 @@ function Write-TokenFile {
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($Value.TrimEnd("`r","`n"))
     [System.IO.File]::WriteAllBytes($Path, $bytes)
 
-    # Lock NTFS ACLs to just the current user (and SYSTEM, so backups still work).
-    $acl = New-Object System.Security.AccessControl.FileSecurity
+    # Lock the DACL down to just the current user (and SYSTEM, so backups
+    # still work).
+    #
+    # Use the .NET FileSystemAclExtensions API directly with
+    # AccessControlSections.Access so we ONLY read and write the DACL.
+    # PowerShell's Get-Acl/Set-Acl round-trip the owner/group/SACL fields
+    # too, which triggers a write to the SACL and requires
+    # SeSecurityPrivilege (admin) on some systems even when nothing about
+    # audit rules has changed.
+    #
+    # Note: in PowerShell 7+/.NET Core, the GetAccessControl/SetAccessControl
+    # instance methods on FileInfo were removed; the equivalent functionality
+    # lives on FileSystemAclExtensions in System.IO.FileSystem.AccessControl.
+    $file = [System.IO.FileInfo]::new($Path)
+    $section = [System.Security.AccessControl.AccessControlSections]::Access
+    $acl = [System.IO.FileSystemAclExtensions]::GetAccessControl($file, $section)
+
     $acl.SetAccessRuleProtection($true, $false)   # disable inheritance, drop inherited rules
+
+    foreach ($existing in @($acl.Access)) {
+        [void]$acl.RemoveAccessRule($existing)
+    }
 
     $me = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
     $sys = New-Object System.Security.Principal.SecurityIdentifier `
@@ -83,7 +102,8 @@ function Write-TokenFile {
             [System.Security.AccessControl.AccessControlType]::Allow)
         $acl.AddAccessRule($rule)
     }
-    Set-Acl -Path $Path -AclObject $acl
+
+    [System.IO.FileSystemAclExtensions]::SetAccessControl($file, $acl)
 }
 
 function Get-DockerContainerState {
