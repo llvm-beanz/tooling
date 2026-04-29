@@ -1,0 +1,16 @@
+# Default: let git decide whether a file is text and normalize line endings
+# in the repository to LF. On checkout, git honors core.autocrlf for text.
+* text=auto
+
+# Anything that runs inside a Linux container MUST be LF on disk, regardless
+# of the host's core.autocrlf setting. CRLF in shell scripts / Dockerfiles
+# produces "bad interpreter" / "no such file or directory" errors at runtime.
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+.dockerignore text eol=lf
+
+# Markdown / docs -- normalize, but let the working tree follow autocrlf.
+*.md        text
+
+# PowerShell on Windows expects CRLF.
+*.ps1       text eol=crlf
