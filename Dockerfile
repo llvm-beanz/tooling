@@ -14,7 +14,7 @@
 #   llvm-build                       # ninja -C build
 #   llvm-test                        # ninja -C build check-all
 
-FROM --platform=linux/amd64 ubuntu:24.04
+FROM ubuntu:24.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG TZ=Etc/UTC

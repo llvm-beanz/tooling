@@ -13,7 +13,8 @@ The container does not require, and does not see, any of your host filesystem.
 | --- | --- |
 | [Dockerfile](Dockerfile) | Build/test toolchain image (ubuntu:24.04). Clones llvm-project at build time. |
 | [Config.cmake](Config.cmake) | Initial CMake cache, baked into the image at `/opt/llvm-tooling/Config.cmake`. |
-| [Start-LlvmDev.ps1](Start-LlvmDev.ps1) | Host-side helper: stores a Copilot token and starts the container with it bind-mounted. |
+| [Start-LlvmDev.ps1](Start-LlvmDev.ps1) | Host-side helper (Windows/PowerShell): stores a Copilot token and starts the container with it bind-mounted. |
+| [start-llvm-dev.sh](start-llvm-dev.sh) | Host-side helper (macOS/Linux): same role as `Start-LlvmDev.ps1`. |
 | [scripts/configure.sh](scripts/configure.sh) | `cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -C <cache>`. |
 | [scripts/build.sh](scripts/build.sh) | `ninja -C build`. |
 | [scripts/test.sh](scripts/test.sh) | `ninja -C build check-all` (or chosen targets). |
@@ -80,16 +81,19 @@ docker start -ai llvm-dev-shell # resume
 ## Provisioning a Copilot credential and starting the container
 
 For non-interactive Copilot use (e.g. from a git hook inside the container),
-the [`Start-LlvmDev.ps1`](Start-LlvmDev.ps1) script provisions a GitHub token
-on the host and bind-mounts it into the container as a Docker secret at
-`/run/secrets/copilot_token`. The token never ends up in the image, in
-`docker inspect` output, or in a Docker volume.
+use [`Start-LlvmDev.ps1`](Start-LlvmDev.ps1) (Windows/PowerShell) or
+[`start-llvm-dev.sh`](start-llvm-dev.sh) (macOS/Linux). They provision a
+GitHub token on the host and bind-mount it into the container as a Docker
+secret at `/run/secrets/copilot_token`. The token never ends up in the
+image, in `docker inspect` output, or in a Docker volume.
 
 Inside the image, the [`copilot-run`](scripts/copilot-run.sh) wrapper reads
 that file (or `$COPILOT_TOKEN` as a fallback) and invokes `copilot` with the
 token exposed via `GH_TOKEN`/`GITHUB_TOKEN` for that single command only.
 
 ### One-time setup
+
+Windows / PowerShell:
 
 ```powershell
 # Build the image first.
@@ -102,7 +106,22 @@ docker build -t llvm-dev .
 .\Start-LlvmDev.ps1
 ```
 
+macOS / Linux:
+
+```bash
+# Build the image first.
+docker build -t llvm-dev .
+
+# Provision the token + start the container.
+# Prompts for the token (input is hidden) and stores it at
+# ~/.secrets/copilot-token with mode 0600.
+chmod +x ./start-llvm-dev.sh
+./start-llvm-dev.sh
+```
+
 ### Common operations
+
+Windows / PowerShell:
 
 ```powershell
 # Open a shell in the running container.
@@ -116,34 +135,56 @@ docker stop llvm-dev-shell
 docker start -ai llvm-dev-shell
 ```
 
+macOS / Linux:
+
+```bash
+docker exec -it llvm-dev-shell bash
+docker exec -it llvm-dev-shell copilot-run --prompt "..."
+docker stop llvm-dev-shell
+docker start -ai llvm-dev-shell
+```
+
 ### Rotating the token
 
 Re-run the script to overwrite the host token file. The container picks up
 the new value on the next read (`copilot-run` reads the file each
-invocation), so no restart is needed:
+invocation), so no restart is needed.
+
+Windows / PowerShell:
 
 ```powershell
 .\Start-LlvmDev.ps1                                          # prompt for new token
 .\Start-LlvmDev.ps1 -Token (Get-Content .\new-token.txt -Raw) # non-interactive
 ```
 
-Use `-Recreate` only if you want to change `-TokenPath` or otherwise rebuild
-the container from scratch (the bind-mount source is fixed at container
-creation time):
+macOS / Linux:
+
+```bash
+./start-llvm-dev.sh                                  # prompt for new token
+./start-llvm-dev.sh --token "$(cat ./new-token.txt)" # non-interactive
+```
+
+Use `-Recreate` (PowerShell) / `--recreate` (shell) only if you want to
+change the token path or otherwise rebuild the container from scratch (the
+bind-mount source is fixed at container creation time):
 
 ```powershell
 .\Start-LlvmDev.ps1 -TokenPath D:\secrets\copilot-token -Recreate
 ```
 
-### Other parameters
+```bash
+./start-llvm-dev.sh --token-path /opt/secrets/copilot-token --recreate
+```
 
-| Parameter | Default | Purpose |
-| --- | --- | --- |
-| `-TokenPath` | `%USERPROFILE%\.secrets\copilot-token` | Where the token is stored on the host. |
-| `-Token` | *(prompted)* | Token value; pass non-interactively from a secret store. |
-| `-ImageName` | `llvm-dev` | Image to run. |
-| `-ContainerName` | `llvm-dev-shell` | Container name. |
-| `-Recreate` | off | Remove and recreate any existing container with the same name. |
+### Parameters
+
+| PowerShell | Shell | Default | Purpose |
+| --- | --- | --- | --- |
+| `-TokenPath` | `--token-path` | `%USERPROFILE%\.secrets\copilot-token` / `~/.secrets/copilot-token` | Where the token is stored on the host. |
+| `-Token` | `--token` | *(prompted)* | Token value; pass non-interactively from a secret store. |
+| `-ImageName` | `--image` | `llvm-dev` | Image to run. |
+| `-ContainerName` | `--container` | `llvm-dev-shell` | Container name. |
+| `-Recreate` | `--recreate` | off | Remove and recreate any existing container with the same name. |
 
 ## Persisting build state across containers
 
@@ -186,11 +227,17 @@ and won't auto-follow `ext::` URLs from, say, a submodule):
 git config --global protocol.ext.allow user
 ```
 
+```bash
+git config --global protocol.ext.allow user
+```
+
 If you'd rather scope it more tightly, run the same command from inside the
 local clone (drops `--global`), or pass it per command with
 `git -c protocol.ext.allow=user push ...`.
 
-Start a long-lived container and add it as a remote on your host clone:
+Start a long-lived container and add it as a remote on your host clone.
+
+Windows / PowerShell:
 
 ```powershell
 # Start (or reuse) a container.
@@ -199,6 +246,15 @@ docker run -dit --name llvm-dev-shell llvm-dev
 # From your local llvm-project checkout on the host:
 cd path\to\your\llvm-project
 git remote add container `
+    "ext::docker exec -i llvm-dev-shell %S /home/dev/dev/llvm-project"
+```
+
+macOS / Linux:
+
+```bash
+docker run -dit --name llvm-dev-shell llvm-dev
+cd path/to/your/llvm-project
+git remote add container \
     "ext::docker exec -i llvm-dev-shell %S /home/dev/dev/llvm-project"
 ```
 
