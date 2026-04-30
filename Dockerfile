@@ -106,7 +106,8 @@ RUN set -eux; \
     ln -s /opt/llvm-tooling/scripts/configure.sh  /usr/local/bin/llvm-configure; \
     ln -s /opt/llvm-tooling/scripts/build.sh      /usr/local/bin/llvm-build; \
     ln -s /opt/llvm-tooling/scripts/test.sh       /usr/local/bin/llvm-test; \
-    ln -s /opt/llvm-tooling/scripts/copilot-run.sh /usr/local/bin/copilot-run
+    ln -s /opt/llvm-tooling/scripts/copilot-run.sh /usr/local/bin/copilot-run; \
+    ln -s /opt/llvm-tooling/scripts/agent-setup.sh /usr/local/bin/agent-setup
 
 # A non-root user keeps file ownership on bind-mounted workspaces sane.
 # UID/GID can be overridden at build time to match the host user.
