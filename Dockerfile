@@ -68,7 +68,12 @@ RUN set -eux; \
         gdb \
         less \
         nano \
-        vim; \
+        vim \
+        libvulkan-dev \
+        vulkan-tools \
+        vulkan-validationlayers \
+        mesa-vulkan-drivers \
+        spirv-tools; \
     rm -rf /var/lib/apt/lists/*; \
     locale-gen en_US.UTF-8
 
@@ -76,7 +81,8 @@ ENV LANG=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8 \
     CC=clang \
     CXX=clang++ \
-    CMAKE_GENERATOR=Ninja
+    CMAKE_GENERATOR=Ninja \
+    VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json
 
 # Install Node.js 22 (required by GitHub Copilot CLI) from NodeSource and
 # then install the Copilot CLI globally. After install, `copilot` is on PATH.
@@ -134,9 +140,8 @@ USER ${USER_NAME}
 #
 #   llvm/offload-test-suite        -> LLVM_EXTERNAL_OFFLOADTEST_SOURCE_DIR
 #   llvm/offload-golden-images     -> GOLDENIMAGE_DIR
-#   microsoft/DirectXShaderCompiler -> DXC_DIR (Config.cmake expects a
-#       *built* DXC at build-rel/bin/. The image only clones sources; build
-#       it inside the container if you want DXC_DIR to take effect.)
+#   microsoft/DirectXShaderCompiler -> DXC_DIR. Config.cmake expects a
+#       *built* DXC at build-rel/bin/, so we build it below.
 RUN set -eux; \
     mkdir -p /home/${USER_NAME}/dev; \
     git clone --branch main \
@@ -152,6 +157,24 @@ RUN set -eux; \
     git clone --recurse-submodules --branch main --depth 1 \
         https://github.com/microsoft/DirectXShaderCompiler.git \
         /home/${USER_NAME}/dev/DirectXShaderCompiler
+
+# Build DXC into ~/dev/DirectXShaderCompiler/build-rel so Config.cmake's
+# DXC_DIR path picks it up (~/dev/DirectXShaderCompiler/build-rel/bin/).
+# Also install DXC's `llvm-dis` as `dxil-dis` in /usr/local/bin (the path
+# Config.cmake's DXIL_DIS variable points at). The dev user runs as a
+# non-root user; use sudo (granted earlier) for the system install.
+RUN set -eux; \
+    cmake \
+        -S /home/${USER_NAME}/dev/DirectXShaderCompiler \
+        -B /home/${USER_NAME}/dev/DirectXShaderCompiler/build-rel \
+        -G Ninja \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -C /home/${USER_NAME}/dev/DirectXShaderCompiler/cmake/caches/PredefinedParams.cmake; \
+    cmake --build /home/${USER_NAME}/dev/DirectXShaderCompiler/build-rel \
+        --target all llvm-dis; \
+    sudo install -m 0755 \
+        /home/${USER_NAME}/dev/DirectXShaderCompiler/build-rel/bin/llvm-dis \
+        /usr/local/bin/dxil-dis
 
 # Install the post-receive hook into the llvm-project clone. The hook
 # checks out each pushed branch and, if `agent_prompt.md` exists at the
