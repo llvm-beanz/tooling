@@ -115,7 +115,6 @@ docker build -t llvm-dev .
 # Provision the token + start the container.
 # Prompts for the token (input is hidden) and stores it at
 # ~/.secrets/copilot-token with mode 0600.
-chmod +x ./start-llvm-dev.sh
 ./start-llvm-dev.sh
 ```
 

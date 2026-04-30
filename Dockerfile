@@ -102,7 +102,6 @@ ENV LLVM_CACHE_FILE=/opt/llvm-tooling/Config.cmake
 # `llvm-build`, `llvm-test`, `copilot-run`.
 COPY scripts/ /opt/llvm-tooling/scripts/
 RUN set -eux; \
-    chmod +x /opt/llvm-tooling/scripts/*.sh; \
     ln -s /opt/llvm-tooling/scripts/configure.sh  /usr/local/bin/llvm-configure; \
     ln -s /opt/llvm-tooling/scripts/build.sh      /usr/local/bin/llvm-build; \
     ln -s /opt/llvm-tooling/scripts/test.sh       /usr/local/bin/llvm-test; \
@@ -183,6 +182,5 @@ RUN set -eux; \
 # contents as the prompt.
 COPY --chown=${USER_UID}:${USER_GID} hooks/post-receive \
     /home/${USER_NAME}/dev/llvm-project/.git/hooks/post-receive
-RUN chmod +x /home/${USER_NAME}/dev/llvm-project/.git/hooks/post-receive
 
 CMD ["bash"]
