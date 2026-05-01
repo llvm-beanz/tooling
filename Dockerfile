@@ -149,9 +149,6 @@ RUN set -eux; \
         /home/${USER_NAME}/dev/llvm-project; \
     git -C /home/${USER_NAME}/dev/llvm-project config receive.denyCurrentBranch updateInstead; \
     git clone --branch main --depth 1 \
-        https://github.com/llvm/offload-test-suite.git \
-        /home/${USER_NAME}/dev/offload-test-suite; \
-    git clone --branch main --depth 1 \
         https://github.com/llvm/offload-golden-images.git \
         /home/${USER_NAME}/dev/offload-golden-images; \
     git clone --branch main \
