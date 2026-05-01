@@ -23,6 +23,12 @@ refresh_repo() {
     git -C "${repo}" fetch --tags origin
     git -C "${repo}" reset --hard origin/main
     git -C "${repo}" pull --ff-only origin main
+    # Refresh submodules to match the newly-checked-out tree. Harmless if
+    # the repo has no submodules (.gitmodules absent -> no-op).
+    if [[ -f "${repo}/.gitmodules" ]]; then
+        git -C "${repo}" submodule sync --recursive
+        git -C "${repo}" submodule update --init --recursive --force
+    fi
 }
 
 refresh_repo "${DEV_ROOT}/DirectXShaderCompiler"
