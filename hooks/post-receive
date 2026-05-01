@@ -81,19 +81,25 @@ while read -r old_oid new_oid ref; do
     fi
 
     # Refresh DXC / offload-test-suite / offload-golden-images and rebuild
-    # DXC before running the agent. Failure here is logged but doesn't
-    # abort the agent run -- the existing trees are still usable.
-    if command -v agent-setup >/dev/null 2>&1; then
-        echo "post-receive: running agent-setup (output -> ${LOG_FILE})"
-        log "running agent-setup"
-        if ! agent-setup >> "${LOG_FILE}" 2>&1; then
-            echo "post-receive: agent-setup failed; see ${LOG_FILE}" >&2
-            log "agent-setup failed (continuing)"
+    # DXC before running the agent. Only do this for pushes to the
+    # llvm-project repo, since agent-setup resets the other trees to
+    # origin/main -- which would clobber a push we just received into
+    # one of those repos.
+    if [[ "$(basename "${WORK_TREE}")" == "llvm-project" ]]; then
+        if command -v agent-setup >/dev/null 2>&1; then
+            echo "post-receive: running agent-setup (output -> ${LOG_FILE})"
+            log "running agent-setup"
+            if ! agent-setup >> "${LOG_FILE}" 2>&1; then
+                echo "post-receive: agent-setup failed; see ${LOG_FILE}" >&2
+                log "agent-setup failed (continuing)"
+            else
+                log "agent-setup completed"
+            fi
         else
-            log "agent-setup completed"
+            log "agent-setup not on PATH; skipping refresh"
         fi
     else
-        log "agent-setup not on PATH; skipping refresh"
+        log "skipping agent-setup (repo is $(basename "${WORK_TREE}"))"
     fi
 
     echo "post-receive: running copilot agent for ${branch} (output -> ${LOG_FILE})"

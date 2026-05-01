@@ -27,7 +27,9 @@ if (EXISTS $ENV{HOME}/dev/offload-golden-images/)
 endif()
 
 
-if (EXISTS $ENV{HOME}/dev/DirectXShaderCompiler/build-rel/bin/)
+if (EXISTS /usr/local/bin/dxc)
+  set(DXC_DIR /usr/local/bin/ CACHE STRING "")
+elseif (EXISTS $ENV{HOME}/dev/DirectXShaderCompiler/build-rel/bin/)
   set(DXC_DIR $ENV{HOME}/dev/DirectXShaderCompiler/build-rel/bin/ CACHE STRING "")
 endif()
 

@@ -154,33 +154,31 @@ RUN set -eux; \
     git clone --branch main --depth 1 \
         https://github.com/llvm/offload-golden-images.git \
         /home/${USER_NAME}/dev/offload-golden-images; \
-    git clone --recurse-submodules --branch main --depth 1 \
+    git clone --branch main \
+        https://github.com/llvm/offload-test-suite.git \
+        /home/${USER_NAME}/dev/offload-test-suite; \
+    git -C /home/${USER_NAME}/dev/offload-test-suite config receive.denyCurrentBranch updateInstead; \
+    git clone --recurse-submodules --branch main \
         https://github.com/microsoft/DirectXShaderCompiler.git \
-        /home/${USER_NAME}/dev/DirectXShaderCompiler
+        /home/${USER_NAME}/dev/DirectXShaderCompiler; \
+    git -C /home/${USER_NAME}/dev/DirectXShaderCompiler config receive.denyCurrentBranch updateInstead
 
-# Build DXC into ~/dev/DirectXShaderCompiler/build-rel so Config.cmake's
-# DXC_DIR path picks it up (~/dev/DirectXShaderCompiler/build-rel/bin/).
-# Also install DXC's `llvm-dis` as `dxil-dis` in /usr/local/bin (the path
-# Config.cmake's DXIL_DIS variable points at). The dev user runs as a
-# non-root user; use sudo (granted earlier) for the system install.
-RUN set -eux; \
-    cmake \
-        -S /home/${USER_NAME}/dev/DirectXShaderCompiler \
-        -B /home/${USER_NAME}/dev/DirectXShaderCompiler/build-rel \
-        -G Ninja \
-        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-        -C /home/${USER_NAME}/dev/DirectXShaderCompiler/cmake/caches/PredefinedParams.cmake; \
-    cmake --build /home/${USER_NAME}/dev/DirectXShaderCompiler/build-rel \
-        --target all llvm-dis; \
-    sudo install -m 0755 \
-        /home/${USER_NAME}/dev/DirectXShaderCompiler/build-rel/bin/llvm-dis \
-        /usr/local/bin/dxil-dis
+# Build DXC and install its user-facing artifacts system-wide. The same
+# logic is used by the post-receive hook to keep DXC up to date, so it
+# lives in agent-setup rather than being duplicated here. On this first
+# run agent-setup will configure the build tree, build, then install
+# dxc / dxil-dis / libdxcompiler.so* into /usr/local/{bin,lib}.
+RUN agent-setup
 
-# Install the post-receive hook into the llvm-project clone. The hook
+# Install the post-receive hook into every push-receiving clone. The hook
 # checks out each pushed branch and, if `agent_prompt.md` exists at the
 # repo root on that ref, runs `copilot-run --allow-all` with the file's
 # contents as the prompt.
 COPY --chown=${USER_UID}:${USER_GID} hooks/post-receive \
     /home/${USER_NAME}/dev/llvm-project/.git/hooks/post-receive
+COPY --chown=${USER_UID}:${USER_GID} hooks/post-receive \
+    /home/${USER_NAME}/dev/DirectXShaderCompiler/.git/hooks/post-receive
+COPY --chown=${USER_UID}:${USER_GID} hooks/post-receive \
+    /home/${USER_NAME}/dev/offload-test-suite/.git/hooks/post-receive
 
 CMD ["bash"]
