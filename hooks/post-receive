@@ -105,6 +105,47 @@ while read -r old_oid new_oid ref; do
     echo "post-receive: running copilot agent for ${branch} (output -> ${LOG_FILE})"
     log "running copilot agent for ${branch}"
 
+    # Parse optional YAML frontmatter at the top of the prompt file. Each
+    # `key: value` pair becomes a `--key value` flag passed to copilot-run.
+    # Frontmatter must start on the very first line with `---` and end with
+    # a matching `---` line. The frontmatter block is stripped from the
+    # prompt body before it is handed to the agent.
+    extra_flags=()
+    prompt_body=""
+    if IFS= read -r first_line < "${prompt_path}" && [[ "${first_line}" == "---" ]]; then
+        # Extract the frontmatter block (lines between the first pair of ---).
+        frontmatter="$(awk 'NR==1 && /^---$/ {inside=1; next} inside && /^---$/ {exit} inside {print}' "${prompt_path}")"
+        # Body is everything after the closing ---.
+        prompt_body="$(awk 'NR==1 && /^---$/ {inside=1; next} inside && /^---$/ {inside=0; after=1; next} after {print}' "${prompt_path}")"
+
+        while IFS= read -r fm_line; do
+            # Skip blank lines and comments.
+            [[ -z "${fm_line}" || "${fm_line}" =~ ^[[:space:]]*# ]] && continue
+            if [[ "${fm_line}" =~ ^[[:space:]]*([A-Za-z0-9_-]+)[[:space:]]*:[[:space:]]*(.*)$ ]]; then
+                key="${BASH_REMATCH[1]}"
+                value="${BASH_REMATCH[2]}"
+                # Strip surrounding single or double quotes.
+                value="${value%\"}"; value="${value#\"}"
+                value="${value%\'}"; value="${value#\'}"
+                # Trim trailing whitespace.
+                value="${value%"${value##*[![:space:]]}"}"
+                if [[ -n "${value}" ]]; then
+                    extra_flags+=("--${key}" "${value}")
+                else
+                    extra_flags+=("--${key}")
+                fi
+            else
+                log "ignoring unrecognized frontmatter line: ${fm_line}"
+            fi
+        done <<< "${frontmatter}"
+
+        if (( ${#extra_flags[@]} > 0 )); then
+            log "frontmatter flags: ${extra_flags[*]}"
+        fi
+    else
+        prompt_body="$(cat "${prompt_path}")"
+    fi
+
     # cd into the working tree so the agent operates in the right directory.
     # Pass the prompt as the value of -p (read the file contents in shell);
     # this Copilot CLI version does not support --prompt-file.
@@ -113,7 +154,8 @@ while read -r old_oid new_oid ref; do
         copilot-run \
             --allow-all \
             --no-color \
-            -p "$(cat "${prompt_path}")" \
+            "${extra_flags[@]}" \
+            -p "${prompt_body}" \
             >> "${LOG_FILE}" 2>&1
     ) || {
         echo "post-receive: copilot agent run failed; see ${LOG_FILE}" >&2

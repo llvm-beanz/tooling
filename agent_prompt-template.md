@@ -1,3 +1,6 @@
+---
+model: claude-opus-4.7
+---
 # Initial Guidelines
 
 Please make sure that your changes are appropriately tested with unit tests
