@@ -87,8 +87,15 @@ function Write-TokenFile {
 
     $acl.SetAccessRuleProtection($true, $false)   # disable inheritance, drop inherited rules
 
-    foreach ($existing in @($acl.Access)) {
-        [void]$acl.RemoveAccessRule($existing)
+    # $acl.Access can be empty after dropping inherited rules; @() around a
+    # null/empty AuthorizationRuleCollection yields @($null) in PowerShell,
+    # which RemoveAccessRule rejects. Filter nulls explicitly.
+    if ($acl.Access) {
+        foreach ($existing in @($acl.Access)) {
+            if ($null -ne $existing) {
+                [void]$acl.RemoveAccessRule($existing)
+            }
+        }
     }
 
     $me = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
