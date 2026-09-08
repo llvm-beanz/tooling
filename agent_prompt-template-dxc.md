@@ -2,7 +2,7 @@
 
 Please make sure that your changes are appropriately tested with unit tests
 covering each phase of translation in the compiler, and that your changes
-conform to the [LVLM Coding Standards](llvm/docs/CodingStandards.rst).
+conform to the [LLVM Coding Standards](llvm/docs/CodingStandards.rst).
 
 Verify your changes by building and testing using the
 cmake/caches/PredefinedParams.cmake file with CMake's -C flag to configure the
@@ -14,4 +14,13 @@ the root of the repository and commit it in its own commit when you're done.
 
 # Request
 
-<insert prompt>
+This sample HLSL:
+
+```
+[numthreads(1, 1, 1)]
+void main(uint3 tid : SV_DispatchThreadID) {
+  ResourceDescriptorHeap[tid.x];
+}
+```
+
+Crashes DXC when built with `-T cs_6_6`, please identify and fix the crash.

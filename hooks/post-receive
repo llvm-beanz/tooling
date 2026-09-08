@@ -157,6 +157,14 @@ while read -r old_oid new_oid ref; do
             "${extra_flags[@]}" \
             -p "${prompt_body}" \
             >> "${LOG_FILE}" 2>&1
+        changes=`tail -n 50 ${LOG_FILE} | grep "^Changes"`
+        credits=`tail -n 50 ${LOG_FILE} | grep "^AI Credits"`
+        tokens=`tail -n 50 ${LOG_FILE} | grep "^Tokens"`
+        resume=`tail -n 50 ${LOG_FILE} | grep "^Resume"`
+        echo "post-receive: ${changes}"
+        echo "post-receive: ${credits}"
+        echo "post-receive: ${tokens}"
+        echo "post-receive: ${resume}"
     ) || {
         echo "post-receive: copilot agent run failed; see ${LOG_FILE}" >&2
         log "copilot agent run for ${branch} exited non-zero (ignored)"
@@ -165,6 +173,9 @@ while read -r old_oid new_oid ref; do
 
     log "copilot agent run for ${branch} completed"
 done
+
+# Stash anything accidentially left behind.
+git -C "${WORK_TREE}" stash push -u
 
 # Always succeed; pushes must not be blocked by hook side effects.
 exit 0

@@ -1,11 +1,11 @@
 ---
-model: claude-opus-4.7
+model: claude-sonnet-5
 ---
 # Initial Guidelines
 
 Please make sure that your changes are appropriately tested with unit tests
 covering each phase of translation in the compiler, and that your changes
-conform to the [LVLM Coding Standards](llvm/docs/CodingStandards.rst).
+conform to the [LLVM Coding Standards](llvm/docs/CodingStandards.rst).
 
 Verify your changes by building and testing using the
 /opt/llvm-tooling/Config.cmake cache file with CMake's -C flag to configure the

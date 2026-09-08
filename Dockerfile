@@ -14,7 +14,7 @@
 #   llvm-build                       # ninja -C build
 #   llvm-test                        # ninja -C build check-all
 
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG TZ=Etc/UTC
@@ -73,7 +73,10 @@ RUN set -eux; \
         vulkan-tools \
         vulkan-validationlayers \
         mesa-vulkan-drivers \
-        spirv-tools; \
+        spirv-tools \
+        libx11-dev \
+        ibglx-dev \
+        libgl-dev; \
     rm -rf /var/lib/apt/lists/*; \
     locale-gen en_US.UTF-8
 
@@ -158,7 +161,10 @@ RUN set -eux; \
     git clone --recurse-submodules --branch main \
         https://github.com/microsoft/DirectXShaderCompiler.git \
         /home/${USER_NAME}/dev/DirectXShaderCompiler; \
-    git -C /home/${USER_NAME}/dev/DirectXShaderCompiler config receive.denyCurrentBranch updateInstead
+    git -C /home/${USER_NAME}/dev/DirectXShaderCompiler config receive.denyCurrentBranch updateInstead; \
+    git clone --recurse-submodules \
+        https://github.com/KhronosGroup/VK-GL-CTS.git \
+        /home/${USER_NAME}/dev/VK-GL-CTS;
 
 # Build DXC and install its user-facing artifacts system-wide. The same
 # logic is used by the post-receive hook to keep DXC up to date, so it
