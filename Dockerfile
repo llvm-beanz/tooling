@@ -75,7 +75,7 @@ RUN set -eux; \
         mesa-vulkan-drivers \
         spirv-tools \
         libx11-dev \
-        ibglx-dev \
+        libglx-dev \
         libgl-dev; \
     rm -rf /var/lib/apt/lists/*; \
     locale-gen en_US.UTF-8
