@@ -111,8 +111,6 @@ RUN set -eux; \
     ln -s /opt/llvm-tooling/scripts/copilot-run.sh /usr/local/bin/copilot-run; \
     ln -s /opt/llvm-tooling/scripts/agent-setup.sh /usr/local/bin/agent-setup
 
-COPY skills/ ~/.agents/skills/
-
 # A non-root user keeps file ownership on bind-mounted workspaces sane.
 # UID/GID can be overridden at build time to match the host user.
 ARG USER_NAME=dev
@@ -185,5 +183,7 @@ COPY --chown=${USER_UID}:${USER_GID} hooks/post-receive \
     /home/${USER_NAME}/dev/DirectXShaderCompiler/.git/hooks/post-receive
 COPY --chown=${USER_UID}:${USER_GID} hooks/post-receive \
     /home/${USER_NAME}/dev/offload-test-suite/.git/hooks/post-receive
+
+COPY skills/ /home/${USER_NAME}/.agents/skills/
 
 CMD ["bash"]
